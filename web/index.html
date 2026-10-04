@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Aura AI</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+
+            margin: 0;
+
+            min-height: 100vh;
+
+            font-family:
+                Arial,
+                sans-serif;
+
+            background:
+                radial-gradient(
+                    circle at top,
+                    #27345f,
+                    #080c18 60%
+                );
+
+            color: white;
+
+        }
+
+        .app {
+
+            width: 100%;
+
+            max-width: 700px;
+
+            min-height: 100vh;
+
+            margin: auto;
+
+            display: flex;
+
+            flex-direction: column;
+
+        }
+
+        header {
+
+            padding: 20px;
+
+            border-bottom:
+                1px solid #30384f;
+
+            display: flex;
+
+            justify-content:
+                space-between;
+
+            align-items: center;
+
+        }
+
+        .title {
+
+            font-size: 24px;
+
+            font-weight: bold;
+
+        }
+
+        .status {
+
+            font-size: 12px;
+
+            padding:
+                7px 11px;
+
+            border-radius: 20px;
+
+            background: #182238;
+
+            color: #8ee7ff;
+
+        }
+
+        #chat {
+
+            flex: 1;
+
+            padding: 20px;
+
+            overflow-y: auto;
+
+        }
+
+        .message {
+
+            max-width: 85%;
+
+            margin-bottom: 15px;
+
+            padding:
+                13px 15px;
+
+            border-radius: 15px;
+
+            line-height: 1.5;
+
+            white-space: pre-wrap;
+
+        }
+
+        .user {
+
+            margin-left: auto;
+
+            background: #3155a6;
+
+        }
+
+        .aura {
+
+            margin-right: auto;
+
+            background: #20283b;
+
+        }
+
+        .input-area {
+
+            padding: 15px;
+
+            display: flex;
+
+            gap: 10px;
+
+            border-top:
+                1px solid #30384f;
+
+            background: #080c18;
+
+        }
+
+        textarea {
+
+            flex: 1;
+
+            resize: none;
+
+            min-height: 50px;
+
+            max-height: 140px;
+
+            padding: 14px;
+
+            border-radius: 12px;
+
+            border:
+                1px solid #39445f;
+
+            background: #151c2d;
+
+            color: white;
+
+            outline: none;
+
+        }
+
+        button {
+
+            width: 80px;
+
+            border: none;
+
+            border-radius: 12px;
+
+            background: #4c6fff;
+
+            color: white;
+
+            font-weight: bold;
+
+        }
+
+        button:disabled {
+
+            opacity: 0.5;
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="app">
+
+    <header>
+
+        <div class="title">
+            ✦ Aura AI
+        </div>
+
+        <div
+            class="status"
+            id="status"
+        >
+            Connecting...
+        </div>
+
+    </header>
+
+
+    <div id="chat">
+
+        <div class="message aura">
+
+            Hello. I am Aura AI.
+            My model architecture is being built.
+
+        </div>
+
+    </div>
+
+
+    <div class="input-area">
+
+        <textarea
+            id="message"
+            placeholder="Message Aura..."
+        ></textarea>
+
+        <button id="send">
+            Send
+        </button>
+
+    </div>
+
+</div>
+
+
+<script>
+
+const chat =
+    document.getElementById("chat");
+
+const input =
+    document.getElementById("message");
+
+const sendButton =
+    document.getElementById("send");
+
+const status =
+    document.getElementById("status");
+
+
+const sessionId =
+    crypto.randomUUID();
+
+
+function addMessage(
+    text,
+    type
+) {
+
+    const message =
+        document.createElement("div");
+
+    message.className =
+        "message " + type;
+
+    message.textContent =
+        text;
+
+    chat.appendChild(message);
+
+    chat.scrollTop =
+        chat.scrollHeight;
+}
+
+
+async function checkHealth() {
+
+    try {
+
+        const response =
+            await fetch("/api/health");
+
+        if (response.ok) {
+
+            status.textContent =
+                "Online";
+
+        } else {
+
+            status.textContent =
+                "Offline";
+        }
+
+    } catch {
+
+        status.textContent =
+            "Offline";
+    }
+}
+
+
+async function sendMessage() {
+
+    const message =
+        input.value.trim();
+
+    if (!message) {
+        return;
+    }
+
+    addMessage(
+        message,
+        "user"
+    );
+
+    input.value = "";
+
+    sendButton.disabled = true;
+
+
+    addMessage(
+        "Thinking...",
+        "aura"
+    );
+
+
+    const thinking =
+        chat.lastElementChild;
+
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/chat",
+                {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
+                        message:
+                            message,
+
+                        session_id:
+                            sessionId
+
+                    })
+
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        thinking.textContent =
+            data.reply ||
+            "Aura returned no response.";
+
+
+    } catch {
+
+        thinking.textContent =
+            "Aura backend connection failed.";
+
+    }
+
+
+    sendButton.disabled = false;
+
+    input.focus();
+}
+
+
+sendButton.addEventListener(
+    "click",
+    sendMessage
+);
+
+
+input.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (
+            event.key === "Enter" &&
+            !event.shiftKey
+        ) {
+
+            event.preventDefault();
+
+            sendMessage();
+
+        }
+
+    }
+);
+
+
+checkHealth();
+
+</script>
+
+</body>
+
+</html>
