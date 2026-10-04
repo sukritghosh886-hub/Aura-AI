@@ -28,8 +28,8 @@ app.add_middleware(
 # Supabase
 # --------------------------------------------------
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
+SUPABASE_URL = ("os.getenvhttps://qcgilnfcmzhbvadqxcfj.supabase.co")
+SUPABASE_KEY = ("os.getenvsb_publishable_H4wAsdm3BIDzp02HOJH0Bg_Q9EcTCHP")
 
 supabase: Optional[Client] = None
 
