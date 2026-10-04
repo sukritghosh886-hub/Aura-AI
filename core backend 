@@ -1,0 +1,123 @@
+import os
+from typing import Optional
+
+import httpx
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+app = FastAPI(title="Aura AI", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = "default"
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    session_id: str
+
+
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "Aura AI",
+        "version": "0.1.0",
+    }
+
+
+async def call_model(message: str) -> str:
+    api_key = os.getenv("AI_API_KEY")
+
+    if not api_key:
+        return (
+            "Aura is running, but no AI_API_KEY is configured yet. "
+            "Add the model provider key to enable live AI replies."
+        )
+
+    base_url = os.getenv(
+        "AI_BASE_URL",
+        "https://api.openai.com/v1",
+    )
+
+    model = os.getenv(
+        "AI_MODEL",
+        "gpt-5.6-mini",
+    )
+
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are Aura AI, a helpful personal AI assistant. "
+                    "Be concise and honest about your capabilities. "
+                    "Never claim an action was performed unless it actually was."
+                ),
+            },
+            {
+                "role": "user",
+                "content": message,
+            },
+        ],
+        "temperature": 0.2,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            f"{base_url.rstrip('/')}/chat/completions",
+            json=payload,
+            headers=headers,
+        )
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail="AI provider request failed",
+        )
+
+    data = response.json()
+
+    return data["choices"][0]["message"]["content"]
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    message = request.message.strip()
+
+    if not message:
+        raise HTTPException(
+            status_code=400,
+            detail="Message cannot be empty",
+        )
+
+    reply = await call_model(message)
+
+    return ChatResponse(
+        reply=reply,
+        session_id=request.session_id or "default",
+    )
+
+
+app.mount(
+    "/",
+    StaticFiles(directory="web", html=True),
+    name="web",
+)
