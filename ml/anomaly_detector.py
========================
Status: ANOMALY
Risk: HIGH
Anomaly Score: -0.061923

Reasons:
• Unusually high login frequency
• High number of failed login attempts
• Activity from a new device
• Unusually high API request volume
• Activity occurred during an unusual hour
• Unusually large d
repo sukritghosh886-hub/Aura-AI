@@ -1,0 +1,101 @@
+import joblib
+import pandas as pd
+import os
+
+MODEL_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "saved_model",
+    "isolation_forest.joblib"
+)
+
+FEATURES = [
+    "login_frequency",
+    "failed_logins",
+    "new_device",
+    "api_requests",
+    "unusual_hour",
+    "data_transfer_mb"
+]
+
+
+class AuraAnomalyDetector:
+
+    def __init__(self):
+        self.model = joblib.load(MODEL_PATH)
+
+    def calculate_risk(self, score):
+        if score < -0.08:
+            return "CRITICAL"
+        elif score < -0.04:
+            return "HIGH"
+        elif score < 0:
+            return "MEDIUM"
+        else:
+            return "LOW"
+
+    def explain_event(self, event):
+        reasons = []
+
+        if event["login_frequency"] > 12:
+            reasons.append("Unusually high login frequency")
+
+        if event["failed_logins"] >= 5:
+            reasons.append("High number of failed login attempts")
+
+        if event["new_device"] == 1:
+            reasons.append("Activity from a new device")
+
+        if event["api_requests"] > 250:
+            reasons.append("Unusually high API request volume")
+
+        if event["unusual_hour"] == 1:
+            reasons.append("Activity occurred during an unusual hour")
+
+        if event["data_transfer_mb"] > 250:
+            reasons.append("Unusually large data transfer")
+
+        if not reasons:
+            reasons.append("Anomaly detected from combined behavior")
+
+        return reasons
+
+    def predict(self, event):
+        df = pd.DataFrame([event])
+
+        missing = [
+            feature for feature in FEATURES
+            if feature not in df.columns
+        ]
+
+        if missing:
+            raise ValueError(
+                f"Missing required features: {missing}"
+            )
+
+        X = df[FEATURES]
+
+        prediction = self.model.predict(X)[0]
+        score = float(
+            self.model.decision_function(X)[0]
+        )
+
+        status = (
+            "ANOMALY"
+            if prediction == -1
+            else "NORMAL"
+        )
+
+        risk_level = self.calculate_risk(score)
+        reasons = self.explain_event(event)
+
+        return {
+            "status": status,
+            "risk_level": risk_level,
+            "anomaly_score": round(score, 6),
+            "reasons": reasons
+        }
+
+
+def analyze_security_event(event):
+    detector = AuraAnomalyDetector()
+    return detector.predict(event)
